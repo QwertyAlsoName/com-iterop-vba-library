@@ -94,5 +94,160 @@ namespace Iterop.VbaLibrary
                    + 0.00643 * Math.Pow(t, 2)
                    + 253.0   * Math.Log(t);
         }
+
+        /// <summary>
+        /// Converts API gravity to specific gravity relative to water.
+        /// </summary>
+        /// <remarks>
+        /// HOW TO USE:
+        /// Call this method to convert between API and specific gravity scales.
+        /// API gravity is a measure commonly used in the petroleum industry.
+        /// Specific gravity compares oil density to water density.
+        /// 
+        /// EXAMPLE IN VBA:
+        ///   Dim calc As Object
+        ///   Set calc = CreateObject("vbdl")
+        ///   Dim sg As Double
+        ///   sg = calc.ApiToSpecificGravity(45.5)
+        ///   MsgBox "Specific Gravity: " &amp; sg
+        /// </remarks>
+        /// <param name="apiGravity">API gravity value (typically 10–80 for crude oils).</param>
+        /// <returns>Specific gravity relative to water (dimensionless).</returns>
+        [SuppressMessage("Performance", "CA1822:Mark members as static",
+            Justification = "COM interop requires instance methods; static methods are not included in the AutoDual type library.")]
+        public double ApiToSpecificGravity(double apiGravity)
+        {
+            return 141.5 / (apiGravity + 131.5);
+        }
+
+        /// <summary>
+        /// Converts specific gravity to API gravity.
+        /// </summary>
+        /// <remarks>
+        /// HOW TO USE:
+        /// Use this to convert specific gravity values to the API scale.
+        /// Useful when you have oil density data but need API gravity for industry-standard reports.
+        /// 
+        /// EXAMPLE IN VBA:
+        ///   Dim calc As Object
+        ///   Set calc = CreateObject("vbdl")
+        ///   Dim api As Double
+        ///   api = calc.SpecificGravityToApi(0.8)
+        ///   MsgBox "API Gravity: " &amp; api &amp; " degrees"
+        /// </remarks>
+        /// <param name="specificGravity">Specific gravity relative to water. Must be greater than zero.</param>
+        /// <returns>API gravity (degrees).</returns>
+        [SuppressMessage("Performance", "CA1822:Mark members as static",
+            Justification = "COM interop requires instance methods; static methods are not included in the AutoDual type library.")]
+        public double SpecificGravityToApi(double specificGravity)
+        {
+            if (specificGravity <= 0.0)
+                throw new ArgumentOutOfRangeException("specificGravity", "Specific gravity must be greater than zero.");
+            return (141.5 / specificGravity) - 131.5;
+        }
+
+        /// <summary>
+        /// Calculates formation volume factor (Bo) for oil at a given pressure and temperature.
+        /// </summary>
+        /// <remarks>
+        /// HOW TO USE:
+        /// Formation volume factor is the ratio of volume at reservoir conditions to volume at standard conditions.
+        /// This method uses a simplified correlation for quick field estimates.
+        /// Bo values typically range from 1.0 to 2.0 for most crude oils.
+        /// 
+        /// EXAMPLE IN VBA:
+        ///   Dim calc As Object
+        ///   Set calc = CreateObject("vbdl")
+        ///   Dim bo As Double
+        ///   bo = calc.CalculateFormationVolumeFactor(0.8, 25000, 70)
+        ///   MsgBox "Formation Volume Factor (Bo): " &amp; bo
+        /// </remarks>
+        /// <param name="specificGravity">Oil specific gravity relative to water. Must be greater than zero.</param>
+        /// <param name="pressureKPa">Current pressure (kPa). Must be greater than zero.</param>
+        /// <param name="temperatureCelsius">Temperature (°C).</param>
+        /// <returns>Formation volume factor (dimensionless, typically 0.9–2.5).</returns>
+        [SuppressMessage("Performance", "CA1822:Mark members as static",
+            Justification = "COM interop requires instance methods; static methods are not included in the AutoDual type library.")]
+        public double CalculateFormationVolumeFactor(double specificGravity, double pressureKPa, double temperatureCelsius)
+        {
+            if (specificGravity <= 0.0)
+                throw new ArgumentOutOfRangeException("specificGravity", "Oil specific gravity must be greater than zero.");
+            if (pressureKPa <= 0.0)
+                throw new ArgumentOutOfRangeException("pressureKPa", "Pressure must be greater than zero.");
+
+            double api = 141.5 / specificGravity - 131.5;
+            double pPsi = pressureKPa * 14.22334;
+            double tRankine = (temperatureCelsius * 1.8 + 32.0) + 459.67;
+
+            double bo = 0.98 + 0.0001 * api + 0.000005 * pPsi + 0.00001 * tRankine;
+            return bo;
+        }
+
+        /// <summary>
+        /// Calculates gas viscosity at given pressure and temperature using a simplified correlation.
+        /// </summary>
+        /// <remarks>
+        /// HOW TO USE:
+        /// Gas viscosity is essential for flow rate predictions and pressure drop calculations.
+        /// This method uses a simplified correlation valid for natural gases at moderate pressures.
+        /// Results are in centipoise (cP).
+        /// 
+        /// EXAMPLE IN VBA:
+        ///   Dim calc As Object
+        ///   Set calc = CreateObject("vbdl")
+        ///   Dim gasVis As Double
+        ///   gasVis = calc.CalculateGasViscosity(30000, 80)
+        ///   MsgBox "Gas Viscosity: " &amp; gasVis &amp; " cP"
+        /// </remarks>
+        /// <param name="pressureKPa">Gas pressure (kPa). Must be greater than zero.</param>
+        /// <param name="temperatureCelsius">Gas temperature (°C).</param>
+        /// <returns>Gas viscosity in centipoise (cP).</returns>
+        [SuppressMessage("Performance", "CA1822:Mark members as static",
+            Justification = "COM interop requires instance methods; static methods are not included in the AutoDual type library.")]
+        public double CalculateGasViscosity(double pressureKPa, double temperatureCelsius)
+        {
+            if (pressureKPa <= 0.0)
+                throw new ArgumentOutOfRangeException("pressureKPa", "Pressure must be greater than zero.");
+
+            double pAtm = pressureKPa / 101.325;
+            double tKelvin = temperatureCelsius + 273.15;
+
+            // Simplified Sutherland-based correlation for natural gas
+            double viscosityAtAtm = 0.0001 + 0.000002 * (tKelvin - 273.15);
+            double viscosity = viscosityAtAtm * Math.Sqrt(pAtm);
+
+            return viscosity;
+        }
+
+        /// <summary>
+        /// Calculates hydrostatic pressure at a given depth.
+        /// </summary>
+        /// <remarks>
+        /// HOW TO USE:
+        /// This simple method calculates hydrostatic pressure for water columns.
+        /// Useful for initial estimates in wells with water zones.
+        /// Assumes standard water density of 1000 kg/m³.
+        /// 
+        /// EXAMPLE IN VBA:
+        ///   Dim calc As Object
+        ///   Set calc = CreateObject("vbdl")
+        ///   Dim hydroPres As Double
+        ///   hydroPres = calc.CalculateHydrostaticPressure(2500)
+        ///   MsgBox "Hydrostatic Pressure at 2500m: " &amp; hydroPres &amp; " kPa"
+        /// </remarks>
+        /// <param name="depthMeters">Vertical depth in meters. Must be greater than or equal to zero.</param>
+        /// <returns>Hydrostatic pressure in kPa.</returns>
+        [SuppressMessage("Performance", "CA1822:Mark members as static",
+            Justification = "COM interop requires instance methods; static methods are not included in the AutoDual type library.")]
+        public double CalculateHydrostaticPressure(double depthMeters)
+        {
+            if (depthMeters < 0.0)
+                throw new ArgumentOutOfRangeException("depthMeters", "Depth must be greater than or equal to zero.");
+
+            // Standard water density = 1000 kg/m³, g = 9.81 m/s²
+            // P = ρ * g * h, result in Pa then converted to kPa
+            double pressurePa = 1000.0 * 9.81 * depthMeters;
+            return pressurePa / 1000.0;
+        }
     }
 }
